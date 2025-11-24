@@ -80,9 +80,14 @@ int creg_unregister(CLIENT_REGISTRY *cr, int fd) {
 }
 
 void creg_wait_for_empty(CLIENT_REGISTRY *cr) {
-    sem_wait(&cr->sem);
+    pthread_mutex_lock(&cr->mutex);
+    while (cr->fd_count > 0) {
+        pthread_mutex_unlock(&cr->mutex);
+        sem_wait(&cr->sem);
+        pthread_mutex_lock(&cr->mutex);
+    }
+    pthread_mutex_unlock(&cr->mutex);
 }
-
 
 void creg_shutdown_all(CLIENT_REGISTRY *cr) {
     pthread_mutex_lock(&cr->mutex);
