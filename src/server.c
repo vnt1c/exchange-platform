@@ -12,36 +12,8 @@
 #include "protocol.h"
 #include "trader.h"
 
-/* I am writing ACK and NACK functions since the trader 
+/* I am writing a NACK function since the trader 
    versions require a trader is initialized...          */
-
-/*
- * Send an ACK packet to a specific fd
- * 
- * @param fd  The fd to send the ACK packet to
- * @return  0 if successfully sent and -1 if unsuccessful
- */
-static int send_ack(int fd) {
-    struct timespec ts;
-
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
-        perror("clock_gettime");
-        return -1;
-    }
-
-    BRS_PACKET_HEADER ack = {
-        .type = BRS_ACK_PKT,
-        .size = 0,
-        .timestamp_sec  = htonl((uint32_t)ts.tv_sec),
-        .timestamp_nsec = htonl((uint32_t)ts.tv_nsec)
-    };
-
-    if (proto_send_packet(fd, &ack, NULL) == -1) {
-        return -1;
-    }
-
-    return 0;
-}
 
 /*
  * Send a NACK packet to a specific fd
@@ -52,18 +24,24 @@ static int send_ack(int fd) {
 static int send_nack(int fd) {
     struct timespec ts;
 
+    // `man 2 clock_gettime`
+    // CLOCK_MONOTONIC is a system-wide clock (I tested demo_server and it seems to use this)
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+        // perror is set in the Linux manual as such
         perror("clock_gettime");
         return -1;
     }
 
+    // create nack header
     BRS_PACKET_HEADER nack = {
         .type = BRS_NACK_PKT,
         .size = 0,
-        .timestamp_sec  = htonl((uint32_t)ts.tv_sec),
+        // Piazza @225: timestamp fields should be filled out for debugging output
+        .timestamp_sec = htonl((uint32_t)ts.tv_sec),
         .timestamp_nsec = htonl((uint32_t)ts.tv_nsec)
     };
 
+    // send the nack packet to the specified fd
     if (proto_send_packet(fd, &nack, NULL) == -1) {
         return -1;
     }

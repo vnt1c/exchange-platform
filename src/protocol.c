@@ -39,7 +39,7 @@ static double now_ts() {
 }
 
 int proto_send_packet(int fd, BRS_PACKET_HEADER *hdr, void *payload) {
-    printf("=> %.9f: type=%s, size=%u\n",
+    fprintf(stderr, "=> %.9f: type=%s, size=%u\n",
            now_ts(), ptype(hdr->type), ntohs(hdr->size));
 
     if (payload == NULL) hdr->size = 0;
