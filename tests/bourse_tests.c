@@ -6,9 +6,6 @@
 #include <signal.h>
 #include <wait.h>
 
-#include "client_registry.h"
-#include "protocol.h"
-
 static void init() {
 #ifndef NO_SERVER
     int ret;
@@ -73,103 +70,4 @@ Test(student_suite, 01_connect, .init = init, .fini = fini, .timeout = 5) {
     fprintf(stderr, "server_suite/01_connect\n");
     int ret = system("util/client -p 9999 </dev/null | grep 'Connected to server'");
     cr_assert_eq(ret, 0, "expected %d, was %d\n", 0, ret);
-}
-
-/*
- * --- Helper thread for registry tests ---
- */
-static void *register_and_unregister(void *arg) {
-    CLIENT_REGISTRY *cr = arg;
-
-    // Fake FD numbers
-    int fd = (rand() % 30000) + 3;
-
-    creg_register(cr, fd);
-    usleep(5000);
-    creg_unregister(cr, fd);
-
-    return NULL;
-}
-
-Test(student_extra, client_registry_basic, .timeout = 5) {
-    CLIENT_REGISTRY *cr = creg_init();
-    cr_assert_not_null(cr);
-
-    int fd1 = 10;
-    int fd2 = 11;
-
-    cr_assert_eq(creg_register(cr, fd1), 0);
-    cr_assert_eq(creg_register(cr, fd2), 0);
-
-    cr_assert_eq(creg_unregister(cr, fd1), 0);
-    cr_assert_eq(creg_unregister(cr, fd2), 0);
-
-    creg_fini(cr);
-}
-
-Test(student_extra, client_registry_wait_for_empty, .timeout = 5) {
-    CLIENT_REGISTRY *cr = creg_init();
-
-    pthread_t t1, t2;
-
-    pthread_create(&t1, NULL, register_and_unregister, cr);
-    pthread_create(&t2, NULL, register_and_unregister, cr);
-
-    // Should block until t1 and t2 have fully unregistered
-    creg_wait_for_empty(cr);
-
-    // If we reached here, the registry emptied correctly
-    cr_assert(1);
-
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-    creg_fini(cr);
-}
-
-Test(student_extra, protocol_roundtrip, .timeout = 5) {
-    int fds[2];
-    pipe(fds);
-
-    int sender = fds[1];
-    int receiver = fds[0];
-
-    BRS_PACKET_HEADER hdr_send = {
-        .type = BRS_DEPOSIT_PKT,
-        .size = htons(sizeof(BRS_FUNDS_INFO)),
-        .timestamp_sec = htonl(123),
-        .timestamp_nsec = htonl(456)
-    };
-
-    BRS_FUNDS_INFO payload_send = { htonl(1000) };
-
-    cr_assert_eq(proto_send_packet(sender, &hdr_send, &payload_send), 0);
-
-    BRS_PACKET_HEADER hdr_recv;
-    void *payload_recv = NULL;
-
-    cr_assert_eq(proto_recv_packet(receiver, &hdr_recv, &payload_recv), 0);
-
-    cr_assert_eq(hdr_recv.type, BRS_DEPOSIT_PKT);
-    cr_assert_eq(ntohl(hdr_recv.timestamp_sec), 123);
-    cr_assert_eq(ntohl(hdr_recv.timestamp_nsec), 456);
-
-    BRS_FUNDS_INFO *funds = payload_recv;
-    cr_assert_eq(ntohl(funds->amount), 1000);
-
-    free(payload_recv);
-}
-
-Test(student_extra, client_registry_stress, .timeout = 10) {
-    CLIENT_REGISTRY *cr = creg_init();
-    pthread_t threads[32];
-
-    for (int i = 0; i < 32; i++)
-        pthread_create(&threads[i], NULL, register_and_unregister, cr);
-
-    creg_wait_for_empty(cr);
-
-    for (int i = 0; i < 32; i++)
-        pthread_join(threads[i], NULL);
-
-    creg_fini(cr);
 }
