@@ -9,39 +9,7 @@
 
 #include "protocol.h"
 
-// Helper to print packet type names
-static const char *ptype(uint8_t t) {
-    switch(t) {
-        case BRS_LOGIN_PKT: return "LOGIN";
-        case BRS_STATUS_PKT: return "STATUS";
-        case BRS_DEPOSIT_PKT: return "DEPOSIT";
-        case BRS_WITHDRAW_PKT: return "WITHDRAW";
-        case BRS_ESCROW_PKT: return "ESCROW";
-        case BRS_RELEASE_PKT: return "RELEASE";
-        case BRS_BUY_PKT: return "BUY";
-        case BRS_SELL_PKT: return "SELL";
-        case BRS_CANCEL_PKT: return "CANCEL";
-        case BRS_ACK_PKT: return "ACK";
-        case BRS_NACK_PKT: return "NACK";
-        case BRS_BOUGHT_PKT: return "BOUGHT";
-        case BRS_SOLD_PKT: return "SOLD";
-        case BRS_POSTED_PKT: return "POSTED";
-        case BRS_CANCELED_PKT: return "CANCELED";
-        case BRS_TRADED_PKT: return "TRADED";
-        default: return "UNKNOWN";
-    }
-}
-
-static double now_ts() {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec / 1e9;
-}
-
 int proto_send_packet(int fd, BRS_PACKET_HEADER *hdr, void *payload) {
-    fprintf(stderr, "=> %.9f: type=%s, size=%u\n",
-           now_ts(), ptype(hdr->type), ntohs(hdr->size));
-
     if (payload == NULL) hdr->size = 0;
 
     // First, send the header
@@ -107,12 +75,6 @@ int proto_recv_packet(int fd, BRS_PACKET_HEADER *hdr, void **payloadp) {
 
     size_t payloadp_len = ntohs(hdr->size);     // network -> host byte order
     if (payloadp_len == 0) return 0;            // nothing to read
-
-    printf("<= %.9f: type=%s, size=%lu%s\n",
-           now_ts(),
-           ptype(hdr->type),
-           payloadp_len,
-           payloadp_len == 0 ? " (no payload)" : "");
     
     void *tmp = malloc(payloadp_len);       // allocate mem for temporary buffer
     if (tmp == NULL) return -1;
